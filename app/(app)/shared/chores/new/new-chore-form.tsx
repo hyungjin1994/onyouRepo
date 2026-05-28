@@ -22,7 +22,17 @@ type Preset = {
   estimatedTime: number;
 };
 
-export function NewChoreForm({ presets }: { presets: Preset[] }) {
+type Member = { id: string; label: string };
+
+export function NewChoreForm({
+  presets,
+  currentUserId,
+  members,
+}: {
+  presets: Preset[];
+  currentUserId: string;
+  members: Member[];
+}) {
   const [state, action, pending] = useActionState(createChore, undefined);
   const [title, setTitle] = useState("");
   const [emoji, setEmoji] = useState("🧹");
@@ -32,6 +42,7 @@ export function NewChoreForm({ presets }: { presets: Preset[] }) {
   const [assignmentType, setAssignmentType] = useState<AssignmentType>(
     AssignmentType.ALTERNATE,
   );
+  const [fixedAssigneeId, setFixedAssigneeId] = useState<string>(currentUserId);
 
   const applyPreset = (p: Preset) => {
     setEmoji(p.emoji);
@@ -163,6 +174,33 @@ export function NewChoreForm({ presets }: { presets: Preset[] }) {
           ))}
         </div>
       </div>
+
+      {assignmentType === AssignmentType.FIXED && (
+        <div className="flex flex-col gap-2">
+          <Label>누가 담당할까요?</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {members.map((m) => (
+              <label key={m.id} className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="fixedAssigneeId"
+                  value={m.id}
+                  checked={fixedAssigneeId === m.id}
+                  onChange={() => setFixedAssigneeId(m.id)}
+                  className="peer sr-only"
+                  required
+                />
+                <span className="flex items-center justify-center rounded-card border border-border bg-surface py-3 text-sm transition-colors peer-checked:border-lavender peer-checked:bg-bg-lavender peer-checked:font-medium">
+                  {m.label}
+                </span>
+              </label>
+            ))}
+          </div>
+          {state?.errors?.fixedAssigneeId?.[0] && (
+            <p className="text-xs text-pink">{state.errors.fixedAssigneeId[0]}</p>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label>예상 소요 시간 (분)</Label>

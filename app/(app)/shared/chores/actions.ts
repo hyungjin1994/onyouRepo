@@ -18,6 +18,7 @@ const ChoreInputSchema = z.object({
   emoji: z.string().max(4).optional().nullable(),
   frequency: z.enum(ChoreFrequency),
   assignmentType: z.enum(AssignmentType),
+  fixedAssigneeId: z.string().uuid().optional().nullable(),
   daysOfWeek: z.array(z.number().int().min(0).max(6)).default([]),
   estimatedTime: z.preprocess(
     (v) => (v === "" || v === null ? null : Number(v)),
@@ -34,7 +35,9 @@ export async function createChore(
   formData: FormData,
 ): Promise<ChoreFormState> {
   const partnership = await getActivePartnership();
-  if (!partnership) return { message: "파트너십이 필요해요." };
+  if (!partnership || !partnership.partnerId) {
+    return { message: "파트너십이 필요해요." };
+  }
 
   const days = formData.getAll("daysOfWeek").map(Number).filter((n) => !Number.isNaN(n));
 
@@ -43,12 +46,28 @@ export async function createChore(
     emoji: formData.get("emoji") || null,
     frequency: formData.get("frequency"),
     assignmentType: formData.get("assignmentType"),
+    fixedAssigneeId: formData.get("fixedAssigneeId") || null,
     daysOfWeek: days,
     estimatedTime: formData.get("estimatedTime") || null,
   });
 
   if (!parsed.success) {
     return { errors: z.flattenError(parsed.error).fieldErrors };
+  }
+
+  // FIXED 방식이면 fixedAssigneeId 필수 + 파트너십 멤버여야 함
+  let fixedAssigneeId: string | null = null;
+  if (parsed.data.assignmentType === AssignmentType.FIXED) {
+    if (!parsed.data.fixedAssigneeId) {
+      return { errors: { fixedAssigneeId: ["담당자를 선택해주세요"] } };
+    }
+    if (
+      parsed.data.fixedAssigneeId !== partnership.ownerId &&
+      parsed.data.fixedAssigneeId !== partnership.partnerId
+    ) {
+      return { errors: { fixedAssigneeId: ["파트너십에 속하지 않은 사용자입니다"] } };
+    }
+    fixedAssigneeId = parsed.data.fixedAssigneeId;
   }
 
   await prisma.chore.create({
@@ -58,6 +77,7 @@ export async function createChore(
       emoji: parsed.data.emoji ?? null,
       frequency: parsed.data.frequency,
       assignmentType: parsed.data.assignmentType,
+      fixedAssigneeId,
       daysOfWeek: parsed.data.daysOfWeek,
       estimatedTime: parsed.data.estimatedTime,
     },
