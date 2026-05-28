@@ -6,10 +6,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { verifySession } from "@/lib/auth/dal";
 import {
+  getAllChores,
   getChoresForToday,
   getFairnessStats,
 } from "@/lib/data/chores";
 import { getActivePartnership } from "@/lib/data/partnership";
+import { CHORE_FREQUENCY_META } from "@/lib/chores";
 import { ChoreCheck } from "./_components/chore-check";
 import { ChoreDelete } from "./_components/chore-delete";
 import { ThanksButton } from "./_components/thanks-button";
@@ -31,8 +33,9 @@ export default async function ChoresPage() {
     );
   }
 
-  const [chores, fairness] = await Promise.all([
+  const [chores, allChores, fairness] = await Promise.all([
     getChoresForToday(),
+    getAllChores(),
     getFairnessStats(),
   ]);
 
@@ -127,13 +130,42 @@ export default async function ChoresPage() {
                       choreLogId={chore.todayLog.id}
                     />
                   )}
-                  <ChoreDelete choreId={chore.id} />
                 </li>
               );
             })}
           </ul>
         )}
       </section>
+
+      {allChores.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium text-foreground-muted">전체 가사 ({allChores.length})</h2>
+          <ul className="flex flex-col gap-2">
+            {allChores.map((chore) => (
+              <li
+                key={chore.id}
+                className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-2.5 shadow-card"
+              >
+                <span className="text-base">{chore.emoji ?? "🧹"}</span>
+                <div className="flex flex-1 flex-col">
+                  <span className="text-sm font-medium">{chore.title}</span>
+                  <span className="text-[11px] text-foreground-weak">
+                    {CHORE_FREQUENCY_META[chore.frequency]?.label}
+                    {chore.estimatedTime ? ` · ${chore.estimatedTime}분` : ""}
+                  </span>
+                </div>
+                <Link
+                  href={`/shared/chores/${chore.id}/edit`}
+                  className="text-[11px] text-foreground-muted hover:text-foreground"
+                >
+                  수정
+                </Link>
+                <ChoreDelete choreId={chore.id} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }

@@ -92,6 +92,20 @@ export const getChoresForToday = cache(
 );
 
 /**
+ * Every chore in the current partnership, regardless of today's schedule.
+ * Useful for the edit/manage UI.
+ */
+export const getAllChores = cache(async () => {
+  const partnership = await getActivePartnership();
+  if (!partnership) return [];
+
+  return prisma.chore.findMany({
+    where: { partnershipId: partnership.id },
+    orderBy: { createdAt: "asc" },
+  });
+});
+
+/**
  * Per-chore breakdown of who completed how many over the last N days.
  * Useful for the fairness dashboard — shows which chores are owned by whom.
  */

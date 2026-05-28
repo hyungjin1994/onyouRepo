@@ -88,6 +88,71 @@ export async function createChore(
   redirect("/shared/chores");
 }
 
+export async function updateChore(
+  choreId: string,
+  _state: ChoreFormState,
+  formData: FormData,
+): Promise<ChoreFormState> {
+  const partnership = await getActivePartnership();
+  if (!partnership || !partnership.partnerId) {
+    return { message: "파트너십이 필요해요." };
+  }
+
+  // 해당 chore가 이 파트너십 소유인지 확인
+  const existing = await prisma.chore.findFirst({
+    where: { id: choreId, partnershipId: partnership.id },
+    select: { id: true },
+  });
+  if (!existing) return { message: "가사를 찾을 수 없어요." };
+
+  const days = formData.getAll("daysOfWeek").map(Number).filter((n) => !Number.isNaN(n));
+
+  const parsed = ChoreInputSchema.safeParse({
+    title: formData.get("title"),
+    emoji: formData.get("emoji") || null,
+    frequency: formData.get("frequency"),
+    assignmentType: formData.get("assignmentType"),
+    fixedAssigneeId: formData.get("fixedAssigneeId") || null,
+    daysOfWeek: days,
+    estimatedTime: formData.get("estimatedTime") || null,
+  });
+
+  if (!parsed.success) {
+    return { errors: z.flattenError(parsed.error).fieldErrors };
+  }
+
+  let fixedAssigneeId: string | null = null;
+  if (parsed.data.assignmentType === AssignmentType.FIXED) {
+    if (!parsed.data.fixedAssigneeId) {
+      return { errors: { fixedAssigneeId: ["담당자를 선택해주세요"] } };
+    }
+    if (
+      parsed.data.fixedAssigneeId !== partnership.ownerId &&
+      parsed.data.fixedAssigneeId !== partnership.partnerId
+    ) {
+      return { errors: { fixedAssigneeId: ["파트너십에 속하지 않은 사용자입니다"] } };
+    }
+    fixedAssigneeId = parsed.data.fixedAssigneeId;
+  }
+
+  await prisma.chore.update({
+    where: { id: choreId },
+    data: {
+      title: parsed.data.title,
+      emoji: parsed.data.emoji ?? null,
+      frequency: parsed.data.frequency,
+      assignmentType: parsed.data.assignmentType,
+      fixedAssigneeId,
+      daysOfWeek: parsed.data.daysOfWeek,
+      estimatedTime: parsed.data.estimatedTime,
+    },
+  });
+
+  revalidatePath("/shared/chores");
+  revalidatePath("/shared");
+  redirect("/shared/chores");
+}
+
 export async function toggleChoreLog(choreId: string) {
   const session = await verifySession();
   const partnership = await getActivePartnership();
