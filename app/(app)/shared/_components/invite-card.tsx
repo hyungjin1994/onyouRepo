@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 
@@ -15,7 +16,17 @@ export function InviteCard({
   createdAt: Date | string;
 }) {
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
   const createdAtDate = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+
+  // 파트너가 코드 입력해 ACTIVE되는 순간 자동 화면 전환되도록
+  // 5초마다 RSC를 무효화한다 (페이지 자체가 가벼워서 부담 적음).
+  useEffect(() => {
+    const id = setInterval(() => {
+      router.refresh();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [router]);
 
   const copy = async () => {
     try {
